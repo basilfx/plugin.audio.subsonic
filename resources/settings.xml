@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<settings>
+    <setting id="subsonic_url" type="text" label="URL" default="http://demo.subsonic.org"/>
+    <setting id="username" type="text" label="Username" default="guest3"/>
+    <setting id="password" type="text" option="hidden" label="Password" default="guest"/>
+    <setting id="random_count" type="labelenum" label="Random songs" values="10|15|20|25"/>
+    <setting id="format" type="labelenum" label="Format" values="mp3|raw|flv|ogg"/>
+    <setting id="bitrate" type="labelenum" label="Bitrate" values="320|256|224|192|160|128|112|96|80|64|56|48|40|32"/>
+</settings>
