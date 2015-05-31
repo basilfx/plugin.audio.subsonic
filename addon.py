@@ -18,7 +18,7 @@ import libsonic_extra
 
 class Plugin(object):
     """
-    Plugin container
+    Plugin container.
     """
 
     def __init__(self, addon_url, addon_handle, addon_args):
@@ -71,6 +71,7 @@ class Plugin(object):
 
     def walk_album_list2_genre(self, genre):
         """
+        Request all albums for a given genre.
         """
 
         offset = 0
@@ -145,6 +146,7 @@ class Plugin(object):
     def walk_random_songs(self, size, genre=None, from_year=None,
                           to_year=None):
         """
+        Request random songs by genre and/or year and iterate over each song.
         """
 
         response = self.connection.getRandomSongs(
@@ -156,26 +158,40 @@ class Plugin(object):
             yield song
 
     def route(self):
+        """
+        Map a Kodi request to certain action.
+        """
+
         mode = self.addon_args.get("mode", ["main_page"])[0]
         getattr(self, mode)()
 
     def add_track(self, track, show_artist=False):
         """
+        Display one track in the list.
         """
 
-        cover_art_url = self.connection.getCoverArtUrl(track["id"])
         url = self.connection.streamUrl(
             sid=track["id"], maxBitRate=self.bitrate,
             tformat=self.trans_format)
 
+        # Create list item
         if show_artist:
-            li = xbmcgui.ListItem(track["artist"] + " - " + track["title"])
+            li = xbmcgui.ListItem(
+                "%s - %s" % (
+                    track.get("artist", "<Unknown>"),
+                    track.get("title", "<Unknown>")))
         else:
-            li = xbmcgui.ListItem(track["title"])
+            li = xbmcgui.ListItem(track.get("title", "<Unknown>"))
 
-        li.setIconImage(cover_art_url)
-        li.setThumbnailImage(cover_art_url)
-        li.setProperty("fanart_image", cover_art_url)
+        # Handle cover art
+        if "coverArt" in track:
+            cover_art_url = self.connection.getCoverArtUrl(track["coverArt"])
+
+            li.setIconImage(cover_art_url)
+            li.setThumbnailImage(cover_art_url)
+            li.setProperty("fanart_image", cover_art_url)
+
+        # Handle metadata
         li.setProperty("IsPlayable", "true")
         li.setInfo(type="Music", infoLabels={
             "Artist": track["artist"],
@@ -188,19 +204,33 @@ class Plugin(object):
             handle=self.addon_handle, url=url, listitem=li)
 
     def add_album(self, album, show_artist=False):
-        cover_art_url = self.connection.getCoverArtUrl(album["id"])
+        """
+        Display one album in the list.
+        """
+
         url = self.build_url({
             "mode": "track_list",
             "album_id": album["id"]})
 
+        # Create list item
         if show_artist:
-            li = xbmcgui.ListItem(album["artist"] + " - " + album["name"])
+            li = xbmcgui.ListItem(
+                "%s - %s" % (
+                    album.get("artist", "<Unknown>"),
+                    album.get("name", "<Unknown>")))
         else:
-            li = xbmcgui.ListItem(album["name"])
+            li = xbmcgui.ListItem(album.get("name", "<Unknown>"))
 
-        li.setIconImage(cover_art_url)
-        li.setThumbnailImage(cover_art_url)
-        li.setProperty("fanart_image", cover_art_url)
+        # Handle cover art
+        if "coverArt" in album:
+            cover_art_url = self.connection.getCoverArtUrl(album["coverArt"])
+
+            li.setIconImage(cover_art_url)
+            li.setThumbnailImage(cover_art_url)
+            li.setProperty("fanart_image", cover_art_url)
+
+        # Handle metadata
+        li.setProperty("IsPlayable", "false")
 
         xbmcplugin.addDirectoryItem(
             handle=self.addon_handle, url=url, listitem=li, isFolder=True)
@@ -409,6 +439,6 @@ def main():
     # Route request to action
     Plugin(addon_url, addon_handle, addon_args).route()
 
-# Start plugin from Kodi
+# Start plugin from within Kodi
 if __name__ == "__main__":
     main()
