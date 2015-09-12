@@ -54,7 +54,9 @@ class Plugin(object):
         """
 
         mode = self.addon_args.get("mode", ["main_page"])[0]
-        getattr(self, mode)()
+
+        if not mode.startswith("_"):
+            getattr(self, mode)()
 
     def add_track(self, track, show_artist=False):
         """
