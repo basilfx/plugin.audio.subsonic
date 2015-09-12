@@ -3,17 +3,6 @@ import urlparse
 import libsonic
 
 
-def force_dict(value):
-    """
-    Coerce the input value to a dict.
-    """
-
-    if type(value) == dict:
-        return value
-    else:
-        return {}
-
-
 def force_list(value):
     """
     Coerce the input value to a list.
@@ -34,22 +23,27 @@ def force_list(value):
         return [value]
 
 
-class Connection(libsonic.Connection):
+class SubsonicClient(libsonic.Connection):
     """
     Extend `libsonic.Connection` with new features and fix a few issues.
 
-    - Add library name property.
     - Parse URL for host and port for constructor.
     - Make sure API results are of of uniform type.
-
-    :param str name: Name of connection.
-    :param str url: Full URL (including protocol) of SubSonic server.
-    :param str username: Username of server.
-    :param str password: Password of server.
+    - Provide methods to intercept URL of binary requests.
+    - Add order property to playlist items.
+    - Add conventient `walk_*' methods to iterate over the API responses.
     """
 
     def __init__(self, url, username, password):
-        self._intercept_url = False
+        """
+        Construct a new SubsonicClient.
+
+        :param str url: Full URL (including scheme) of the SubSonic server.
+        :param str username: Username of the server.
+        :param str password: Password of the server.
+        """
+
+        self.intercept_url = False
 
         # Parse SubSonic URL
         parts = urlparse.urlparse(url)
@@ -69,10 +63,12 @@ class Connection(libsonic.Connection):
         port = parts.port or {"http": 80, "https": 443}[scheme]
 
         # Invoke original constructor
-        super(Connection, self).__init__(host, username, password, port=port)
+        super(SubsonicClient, self).__init__(
+            host, username, password, port=port)
 
-    def getArtists(self, *args, **kwargs):
+    def getIndexes(self, *args, **kwargs):
         """
+        Improve the getIndexes method. Ensures IDs are integers.
         """
 
         def _artists_iterator(artists):
@@ -85,15 +81,33 @@ class Connection(libsonic.Connection):
                 index["artist"] = list(_artists_iterator(index.get("artist")))
                 yield index
 
-        response = super(Connection, self).getArtists(*args, **kwargs)
-        response["artists"] = response.get("artists", {})
-        response["artists"]["index"] = list(
-            _index_iterator(response["artists"].get("index")))
+        def _children_iterator(children):
+            for child in force_list(children):
+                child["id"] = int(child["id"])
+
+                if "parent" in child:
+                    child["parent"] = int(child["parent"])
+                if "coverArt" in child:
+                    child["coverArt"] = int(child["coverArt"])
+                if "artistId" in child:
+                    child["artistId"] = int(child["artistId"])
+                if "albumId" in child:
+                    child["albumId"] = int(child["albumId"])
+
+                yield child
+
+        response = super(SubsonicClient, self).getIndexes(*args, **kwargs)
+        response["indexes"] = response.get("indexes", {})
+        response["indexes"]["index"] = list(
+            _index_iterator(response["indexes"].get("index")))
+        response["indexes"]["child"] = list(
+            _children_iterator(response["indexes"].get("child")))
 
         return response
 
     def getPlaylists(self, *args, **kwargs):
         """
+        Improve the getPlaylists method. Ensures IDs are integers.
         """
 
         def _playlists_iterator(playlists):
@@ -101,7 +115,7 @@ class Connection(libsonic.Connection):
                 playlist["id"] = int(playlist["id"])
                 yield playlist
 
-        response = super(Connection, self).getPlaylists(*args, **kwargs)
+        response = super(SubsonicClient, self).getPlaylists(*args, **kwargs)
         response["playlists"]["playlist"] = list(
             _playlists_iterator(response["playlists"].get("playlist")))
 
@@ -109,66 +123,67 @@ class Connection(libsonic.Connection):
 
     def getPlaylist(self, *args, **kwargs):
         """
+        Improve the getPlaylist method. Ensures IDs are integers and add an
+        order property to each entry.
         """
 
         def _entries_iterator(entries):
-            for entry in force_list(entries):
+            for order, entry in enumerate(force_list(entries), start=1):
                 entry["id"] = int(entry["id"])
+                entry["order"] = order
                 yield entry
 
-        response = super(Connection, self).getPlaylist(*args, **kwargs)
+        response = super(SubsonicClient, self).getPlaylist(*args, **kwargs)
         response["playlist"]["entry"] = list(
             _entries_iterator(response["playlist"].get("entry")))
 
         return response
 
+    def getArtists(self, *args, **kwargs):
+        """
+        Improve the getArtists method. Ensures IDs are integers.
+        """
+
+        def _artists_iterator(artists):
+            for artist in force_list(artists):
+                artist["id"] = int(artist["id"])
+                yield artist
+
+        def _index_iterator(index):
+            for index in force_list(index):
+                index["artist"] = list(_artists_iterator(index.get("artist")))
+                yield index
+
+        response = super(SubsonicClient, self).getArtists(*args, **kwargs)
+        response["artists"] = response.get("artists", {})
+        response["artists"]["index"] = list(
+            _index_iterator(response["artists"].get("index")))
+
+        return response
+
     def getArtist(self, *args, **kwargs):
         """
+        Improve the getArtist method. Ensures IDs are integers.
         """
 
         def _albums_iterator(albums):
             for album in force_list(albums):
                 album["id"] = int(album["id"])
+
+                if "artistId" in album:
+                    album["artistId"] = int(album["artistId"])
+
                 yield album
 
-        response = super(Connection, self).getArtist(*args, **kwargs)
+        response = super(SubsonicClient, self).getArtist(*args, **kwargs)
         response["artist"]["album"] = list(
             _albums_iterator(response["artist"].get("album")))
 
         return response
 
-    def getAlbum(self, *args, **kwargs):
-        ""
-        ""
-
-        def _songs_iterator(songs):
-            for song in force_list(songs):
-                song["id"] = int(song["id"])
-                yield song
-
-        response = super(Connection, self).getAlbum(*args, **kwargs)
-        response["album"]["song"] = list(
-            _songs_iterator(response["album"].get("song")))
-
-        return response
-
-    def getAlbumList2(self, *args, **kwargs):
-        ""
-        ""
-
-        def _album_iterator(albums):
-            for album in force_list(albums):
-                album["id"] = int(album["id"])
-                yield album
-
-        response = super(Connection, self).getAlbumList2(*args, **kwargs)
-        response["albumList2"]["album"] = list(
-            _album_iterator(response["albumList2"].get("album")))
-
-        return response
-
     def getMusicDirectory(self, *args, **kwargs):
         """
+        Improve the getMusicDirectory method. Ensures IDs are integers.
         """
 
         def _children_iterator(children):
@@ -186,9 +201,42 @@ class Connection(libsonic.Connection):
 
                 yield child
 
-        response = super(Connection, self).getMusicDirectory(*args, **kwargs)
+        response = super(SubsonicClient, self).getMusicDirectory(
+            *args, **kwargs)
         response["directory"]["child"] = list(
             _children_iterator(response["directory"].get("child")))
+
+        return response
+
+    def getAlbum(self, *args, **kwargs):
+        """
+        Improve the getAlbum method. Ensures the IDs are real integers.
+        """
+
+        def _songs_iterator(songs):
+            for song in force_list(songs):
+                song["id"] = int(song["id"])
+                yield song
+
+        response = super(SubsonicClient, self).getAlbum(*args, **kwargs)
+        response["album"]["song"] = list(
+            _songs_iterator(response["album"].get("song")))
+
+        return response
+
+    def getAlbumList2(self, *args, **kwargs):
+        """
+        Improve the getAlbumList2 method. Ensures the IDs are real integers.
+        """
+
+        def _album_iterator(albums):
+            for album in force_list(albums):
+                album["id"] = int(album["id"])
+                yield album
+
+        response = super(SubsonicClient, self).getAlbumList2(*args, **kwargs)
+        response["albumList2"]["album"] = list(
+            _album_iterator(response["albumList2"].get("album")))
 
         return response
 
@@ -197,9 +245,9 @@ class Connection(libsonic.Connection):
         Return an URL to the cover art.
         """
 
-        self._intercept_url = True
+        self.intercept_url = True
         url = self.getCoverArt(*args, **kwargs)
-        self._intercept_url = False
+        self.intercept_url = False
 
         return url
 
@@ -208,18 +256,21 @@ class Connection(libsonic.Connection):
         Return an URL to the file to stream.
         """
 
-        self._intercept_url = True
+        self.intercept_url = True
         url = self.stream(*args, **kwargs)
-        self._intercept_url = False
+        self.intercept_url = False
 
         return url
 
     def _doBinReq(self, *args, **kwargs):
         """
-        Intercept request URL.
+        Intercept request URL to provide the URL of the item that is requested.
+
+        If the URL is intercepted, the request is not executed. A username and
+        password is added to provide direct access to the stream.
         """
 
-        if self._intercept_url:
+        if self.intercept_url:
             parts = list(urlparse.urlparse(
                 args[0].get_full_url() + "?" + args[0].data))
             parts[4] = dict(urlparse.parse_qsl(parts[4]))
@@ -228,4 +279,131 @@ class Connection(libsonic.Connection):
 
             return urlparse.urlunparse(parts)
         else:
-            return super(Connection, self)._doBinReq(*args, **kwargs)
+            return super(SubsonicClient, self)._doBinReq(*args, **kwargs)
+
+    def walk_index(self):
+        """
+        Request SubSonic's index and iterate each item.
+        """
+
+        response = self.getIndexes()
+
+        for index in response["indexes"]["index"]:
+            for index in index["artist"]:
+                for item in self.walk_directory(index["id"]):
+                    yield item
+
+        for child in response["indexes"]["child"]:
+            if child.get("isDir"):
+                for child in self.walk_directory(child["id"]):
+                    yield child
+            else:
+                yield child
+
+    def walk_playlists(self):
+        """
+        Request SubSonic's playlists and iterate over each item.
+        """
+
+        response = self.getPlaylists()
+
+        for child in response["playlists"]["playlist"]:
+            yield child
+
+    def walk_playlist(self, playlist_id):
+        """
+        Request SubSonic's playlist items and iterate over each item.
+        """
+
+        response = self.getPlaylist(playlist_id)
+
+        for order, child in response["playlist"]["entry"]:
+            yield child
+
+    def walk_directory(self, directory_id):
+        """
+        Request a SubSonic music directory and iterate over each item.
+        """
+
+        response = self.getMusicDirectory(directory_id)
+
+        for child in response["directory"]["child"]:
+            if child.get("isDir"):
+                for child in self.walk_directory(child["id"]):
+                    yield child
+            else:
+                yield child
+
+    def walk_artist(self, artist_id):
+        """
+        Request a SubSonic artist and iterate over each album.
+        """
+
+        response = self.getArtist(artist_id)
+
+        for child in response["artist"]["album"]:
+            yield child
+
+    def walk_artists(self):
+        """
+        Request all artists and iterate over each item.
+        """
+
+        response = self.getArtists()
+
+        for index in response["artists"]["index"]:
+            for artist in index["artist"]:
+                yield artist
+
+    def walk_genres(self):
+        """
+        Request all genres and iterate over each item.
+        """
+
+        response = self.getGenres()
+
+        for genre in response["genres"]["genre"]:
+            yield genre
+
+    def walk_album_list_genre(self, genre):
+        """
+        Request all albums for a given genre and iterate over each album.
+        """
+
+        offset = 0
+
+        while True:
+            response = self.getAlbumList2(
+                ltype="byGenre", genre=genre, size=500, offset=offset)
+
+            if not response["albumList2"]["album"]:
+                break
+
+            for album in response["albumList2"]["album"]:
+                yield album
+
+            offset += 500
+
+    def walk_album(self, album_id):
+        """
+        Request an alum and iterate over each item.
+        """
+
+        response = self.getAlbum(album_id)
+
+        for song in response["album"]["song"]:
+            yield song
+
+    def walk_random_songs(self, size, genre=None, from_year=None,
+                          to_year=None):
+        """
+        Request random songs by genre and/or year and iterate over each song.
+        """
+
+        response = self.getRandomSongs(
+            size=size, genre=genre, fromYear=from_year, toYear=to_year)
+
+        for song in response["randomSongs"]["song"]:
+            song["id"] = int(song["id"])
+
+            yield song

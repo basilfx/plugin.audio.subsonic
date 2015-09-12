@@ -36,7 +36,7 @@ class Plugin(object):
         self.trans_format = addon.getSetting("trans_format")
 
         # Create connection
-        self.connection = libsonic_extra.Connection(
+        self.connection = libsonic_extra.SubsonicClient(
             self.url, self.username, self.password)
 
     def build_url(self, query):
@@ -47,115 +47,6 @@ class Plugin(object):
         parts[4] = urllib.urlencode(query)
 
         return urlparse.urlunparse(parts)
-
-    def walk_genres(self):
-        """
-        Request Subsonic's genres list and iterate each item.
-        """
-
-        response = self.connection.getGenres()
-
-        for genre in response["genres"]["genre"]:
-            yield genre
-
-    def walk_artists(self):
-        """
-        Request SubSonic's index and iterate each item.
-        """
-
-        response = self.connection.getArtists()
-
-        for index in response["artists"]["index"]:
-            for artist in index["artist"]:
-                yield artist
-
-    def walk_album_list2_genre(self, genre):
-        """
-        Request all albums for a given genre.
-        """
-
-        offset = 0
-
-        while True:
-            response = self.connection.getAlbumList2(
-                ltype="byGenre", genre=genre, size=500, offset=offset)
-
-            if not response["albumList2"]["album"]:
-                break
-
-            for album in response["albumList2"]["album"]:
-                yield album
-
-            offset += 500
-
-    def walk_album(self, album_id):
-        """
-        Request Album and iterate each song.
-        """
-
-        response = self.connection.getAlbum(album_id)
-
-        for song in response["album"]["song"]:
-            yield song
-
-    def walk_playlists(self):
-        """
-        Request SubSonic's playlists and iterate over each item.
-        """
-
-        response = self.connection.getPlaylists()
-
-        for child in response["playlists"]["playlist"]:
-            yield child
-
-    def walk_playlist(self, playlist_id):
-        """
-        Request SubSonic's playlist items and iterate over each item.
-        """
-
-        response = self.connection.getPlaylist(playlist_id)
-
-        for order, child in enumerate(response["playlist"]["entry"], start=1):
-            child["order"] = order
-            yield child
-
-    def walk_directory(self, directory_id):
-        """
-        Request a SubSonic music directory and iterate over each item.
-        """
-
-        response = self.connection.getMusicDirectory(directory_id)
-
-        for child in response["directory"]["child"]:
-            if child.get("isDir"):
-                for child in self.walk_directory(child["id"]):
-                    yield child
-            else:
-                yield child
-
-    def walk_artist(self, artist_id):
-        """
-        Request a SubSonic artist and iterate over each album.
-        """
-
-        response = self.connection.getArtist(artist_id)
-
-        for child in response["artist"]["album"]:
-            yield child
-
-    def walk_random_songs(self, size, genre=None, from_year=None,
-                          to_year=None):
-        """
-        Request random songs by genre and/or year and iterate over each song.
-        """
-
-        response = self.connection.getRandomSongs(
-            size=size, genre=genre, fromYear=from_year, toYear=to_year)
-
-        for song in response["randomSongs"]["song"]:
-            song["id"] = int(song["id"])
-
-            yield song
 
     def route(self):
         """
@@ -260,7 +151,7 @@ class Plugin(object):
         Display playlists.
         """
 
-        for playlist in self.walk_playlists():
+        for playlist in self.connection.walk_playlists():
             cover_art_url = self.connection.getCoverArtUrl(
                 playlist["coverArt"])
             url = self.build_url({
@@ -279,7 +170,7 @@ class Plugin(object):
 
         playlist_id = self.addon_args["playlist_id"][0]
 
-        for track in self.walk_playlist(playlist_id):
+        for track in self.connection.walk_playlist(playlist_id):
             self.add_track(track, show_artist=True)
 
         xbmcplugin.setContent(self.addon_handle, "songs")
@@ -290,7 +181,7 @@ class Plugin(object):
         Display list of genres menu.
         """
 
-        for genre in self.walk_genres():
+        for genre in self.connection.walk_genres():
             url = self.build_url({
                 "mode": "albums_by_genre_list",
                 "foldername": genre["value"].encode("utf-8")})
@@ -308,7 +199,7 @@ class Plugin(object):
 
         genre = self.addon_args["foldername"][0].decode("utf-8")
 
-        for album in self.walk_album_list2_genre(genre):
+        for album in self.connection.walk_album_list_genre(genre):
             self.add_album(album, show_artist=True)
 
         xbmcplugin.setContent(self.addon_handle, "albums")
@@ -319,7 +210,7 @@ class Plugin(object):
         Display artist list
         """
 
-        for artist in self.walk_artists():
+        for artist in self.connection.walk_artists():
             cover_art_url = self.connection.getCoverArtUrl(artist["id"])
             url = self.build_url({
                 "mode": "album_list",
@@ -342,7 +233,7 @@ class Plugin(object):
 
         artist_id = self.addon_args["artist_id"][0]
 
-        for album in self.walk_artist(artist_id):
+        for album in self.connection.walk_artist(artist_id):
             self.add_album(album)
 
         xbmcplugin.setContent(self.addon_handle, "albums")
@@ -355,7 +246,7 @@ class Plugin(object):
 
         album_id = self.addon_args["album_id"][0]
 
-        for track in self.walk_album(album_id):
+        for track in self.connection.walk_album(album_id):
             self.add_track(track)
 
         xbmcplugin.setContent(self.addon_handle, "songs")
@@ -384,7 +275,7 @@ class Plugin(object):
         Display random genre list.
         """
 
-        for genre in self.walk_genres():
+        for genre in self.connection.walk_genres():
             url = self.build_url({
                 "mode": "random_by_genre_track_list",
                 "foldername": genre["value"].encode("utf-8")})
@@ -402,7 +293,7 @@ class Plugin(object):
 
         genre = self.addon_args["foldername"][0].decode("utf-8")
 
-        for track in self.walk_random_songs(
+        for track in self.connection.walk_random_songs(
                 size=self.random_count, genre=genre):
             self.add_track(track, show_artist=True)
 
@@ -419,7 +310,7 @@ class Plugin(object):
         to_year = xbmcgui.Dialog().input(
             "To year", type=xbmcgui.INPUT_NUMERIC)
 
-        for track in self.walk_random_songs(
+        for track in self.connection.walk_random_songs(
                 size=self.random_count, from_year=from_year, to_year=to_year):
             self.add_track(track, show_artist=True)
 
