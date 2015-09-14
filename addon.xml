@@ -8,14 +8,14 @@
     </extension>
     <extension point="xbmc.addon.metadata">
         <summary lang="en">Subsonic music addon for Kodi.</summary>
-        <description lang="en">Subsonic music addon for Kodi.</description>
+        <description lang="en">Subsonic music addon for Kodi. Stream your tunes directly to Kodi.</description>
         <disclaimer lang="en"></disclaimer>
         <language>en</language>
         <platform>all</platform>
         <license>MIT</license>
         <forum></forum>
-        <website>https://github.com/basilfx/plugin.audio.subsonic</website>
+        <website>http://www.subsonic.org</website>
+        <source>https://github.com/basilfx/plugin.audio.subsonic</source>
         <email></email>
-        <source></source>
     </extension>
 </addon>
