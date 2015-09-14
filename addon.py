@@ -33,7 +33,7 @@ class Plugin(object):
 
         self.random_count = addon.getSetting("random_count")
         self.bitrate = addon.getSetting("bitrate")
-        self.trans_format = addon.getSetting("trans_format")
+        self.transcode_format = addon.getSetting("transcode_format")
 
         # Create connection
         self.connection = libsonic_extra.SubsonicClient(
