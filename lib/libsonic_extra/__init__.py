@@ -38,14 +38,14 @@ class SubsonicClient(libsonic.Connection):
         """
         Construct a new SubsonicClient.
 
-        :param str url: Full URL (including scheme) of the SubSonic server.
+        :param str url: Full URL (including scheme) of the Subsonic server.
         :param str username: Username of the server.
         :param str password: Password of the server.
         """
 
         self.intercept_url = False
 
-        # Parse SubSonic URL
+        # Parse Subsonic URL
         parts = urlparse.urlparse(url)
         scheme = parts.scheme or "http"
 
@@ -299,7 +299,7 @@ class SubsonicClient(libsonic.Connection):
 
     def walk_index(self):
         """
-        Request SubSonic's index and iterate each item.
+        Request Subsonic's index and iterate each item.
         """
 
         response = self.getIndexes()
@@ -318,7 +318,7 @@ class SubsonicClient(libsonic.Connection):
 
     def walk_playlists(self):
         """
-        Request SubSonic's playlists and iterate over each item.
+        Request Subsonic's playlists and iterate over each item.
         """
 
         response = self.getPlaylists()
@@ -348,7 +348,7 @@ class SubsonicClient(libsonic.Connection):
 
     def walk_directory(self, directory_id):
         """
-        Request a SubSonic music directory and iterate over each item.
+        Request a Subsonic music directory and iterate over each item.
         """
 
         response = self.getMusicDirectory(directory_id)
@@ -362,7 +362,7 @@ class SubsonicClient(libsonic.Connection):
 
     def walk_artist(self, artist_id):
         """
-        Request a SubSonic artist and iterate over each album.
+        Request a Subsonic artist and iterate over each album.
         """
 
         response = self.getArtist(artist_id)
