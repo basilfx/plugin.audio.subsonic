@@ -240,6 +240,22 @@ class SubsonicClient(libsonic.Connection):
 
         return response
 
+    def getStarred(self, *args, **kwargs):
+        """
+        Improve the getStarred method. Ensures the IDs are real integers.
+        """
+
+        def _song_iterator(songs):
+            for song in force_list(songs):
+                song["id"] = int(song["id"])
+                yield song
+
+        response = super(SubsonicClient, self).getStarred(*args, **kwargs)
+        response["starred"]["song"] = list(
+            _song_iterator(response["starred"].get("song")))
+
+        return response
+
     def getCoverArtUrl(self, *args, **kwargs):
         """
         Return an URL to the cover art.
@@ -312,13 +328,23 @@ class SubsonicClient(libsonic.Connection):
 
     def walk_playlist(self, playlist_id):
         """
-        Request SubSonic's playlist items and iterate over each item.
+        Request Subsonic's playlist items and iterate over each item.
         """
 
         response = self.getPlaylist(playlist_id)
 
-        for order, child in response["playlist"]["entry"]:
+        for child in response["playlist"]["entry"]:
             yield child
+
+    def walk_starred(self):
+        """
+        Request Subsonic's starred songs and iterate over each item.
+        """
+
+        response = self.getStarred()
+
+        for song in response["starred"]["song"]:
+            yield song
 
     def walk_directory(self, directory_id):
         """
@@ -404,6 +430,4 @@ class SubsonicClient(libsonic.Connection):
             size=size, genre=genre, fromYear=from_year, toYear=to_year)
 
         for song in response["randomSongs"]["song"]:
-            song["id"] = int(song["id"])
-
             yield song
