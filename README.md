@@ -1,6 +1,8 @@
 # Subsonic for Kodi
 Kodi plugin to stream music from Subsonic.
 
+**DEPRECATED**: This project is deprecated. Please check out [this fork](https://github.com/gordielachance/plugin.audio.subsonic) for an updated version by @gordielachance!
+
 ## Features
 * Playlist support
 * Browse by artist, album and genre
